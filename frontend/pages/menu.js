@@ -89,17 +89,22 @@ export default function Menu() {
     }
   };
 
+  // Calculate bill
+  const selectedItems = menu.items.filter(item => quantities[item.name] > 0);
+  const billTotal = selectedItems.reduce((sum, item) => sum + (item.price * quantities[item.name]), 0);
+
   if (error && !fallbackSlot) return <div className="min-h-screen flex items-center justify-center font-sans bg-gradient-to-br from-amber-50 to-orange-100">{error}</div>;
   if (!menu) return <div className="min-h-screen flex items-center justify-center font-sans bg-gradient-to-br from-amber-50 to-orange-100">Loading...</div>;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-100 font-sans">
       <div className="bg-white rounded-2xl shadow-xl p-10 w-full max-w-lg border border-orange-100 flex flex-col items-center">
-        <div className="mb-6 flex flex-col items-center">
-          <span className="text-4xl mb-2">🍽️</span>
-          <h2 className="text-2xl font-extrabold text-orange-900 tracking-tight">Order Your Meal</h2>
-          <p className="text-orange-700 text-sm mt-1">XPressMeal Canteen</p>
+        {/* Logo placeholder */}
+        <div className="w-16 h-16 mb-4 bg-orange-200 rounded-full flex items-center justify-center">
+          <span className="text-2xl font-bold text-orange-800">XM</span>
         </div>
+        <h2 className="text-2xl font-extrabold text-orange-900 tracking-tight mb-1">Order Your Meal</h2>
+        <p className="text-orange-700 text-sm mb-6">XPressMeal Canteen</p>
         <div className="mb-4 w-full">
           <label className="block mb-1 font-semibold text-orange-800">Category</label>
           <select value={category} onChange={e => setCategory(e.target.value)} className="w-full p-3 border border-orange-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
@@ -109,13 +114,39 @@ export default function Menu() {
         </div>
         <div className="w-full mb-4">
           <label className="block mb-1 font-semibold text-orange-800">Menu</label>
-          {menu.items.filter(item => item.type === category).map(item => (
-            <div key={item.name} className="flex justify-between items-center mb-2">
-              <span className="text-orange-900">{item.name} <span className="text-gray-500">(₹{item.price})</span></span>
-              <input type="number" min="0" value={quantities[item.name]} onChange={e => setQuantities(q => ({ ...q, [item.name]: Math.max(0, +e.target.value) }))} className="w-20 p-2 border border-orange-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400" />
-            </div>
-          ))}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {menu.items.filter(item => item.type === category).map(item => (
+              <div key={item.name} className="bg-orange-50 border border-orange-200 rounded-xl shadow p-4 flex flex-col items-center">
+                <div className="text-lg font-bold text-orange-900 mb-1">{item.name}</div>
+                <div className="text-gray-600 mb-2">₹{item.price}</div>
+                <div className="flex items-center gap-2 mb-2">
+                  <button type="button" onClick={() => setQuantities(q => ({ ...q, [item.name]: Math.max(0, (q[item.name] || 0) - 1) }))} className="px-2 py-1 bg-orange-200 text-orange-800 rounded hover:bg-orange-300">-</button>
+                  <span className="font-semibold text-lg w-6 text-center">{quantities[item.name] || 0}</span>
+                  <button type="button" onClick={() => setQuantities(q => ({ ...q, [item.name]: (q[item.name] || 0) + 1 }))} className="px-2 py-1 bg-orange-200 text-orange-800 rounded hover:bg-orange-300">+</button>
+                </div>
+                <div className="text-xs text-gray-400">Max/Day: {item.maxPerDay}</div>
+              </div>
+            ))}
+          </div>
         </div>
+        {/* Bill View */}
+        {selectedItems.length > 0 && (
+          <div className="w-full mb-6 bg-white border border-orange-200 rounded-xl shadow p-4">
+            <h4 className="text-lg font-bold text-orange-900 mb-2">Your Bill</h4>
+            <ul className="mb-2">
+              {selectedItems.map(item => (
+                <li key={item.name} className="flex justify-between items-center mb-1">
+                  <span>{item.name} x {quantities[item.name]}</span>
+                  <span>₹{item.price * quantities[item.name]}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="flex justify-between items-center border-t pt-2 mt-2">
+              <span className="font-semibold text-orange-800">Total</span>
+              <span className="font-bold text-orange-900 text-lg">₹{billTotal}</span>
+            </div>
+          </div>
+        )}
         <div className="w-full mb-4">
           <label className="block mb-1 font-semibold text-orange-800">Select Pickup Slot</label>
           <div className="flex flex-col gap-2">
