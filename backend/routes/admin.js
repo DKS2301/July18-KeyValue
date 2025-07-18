@@ -114,16 +114,26 @@ router.patch('/slot/:id/status', jwtAdminAuth, async (req, res) => {
 // GET /api/admin/summary - today's total orders per menu item
 router.get('/summary', jwtAdminAuth, async (req, res) => {
   const today = new Date().toISOString().slice(0, 10);
-  // Find all orders for today
-  const orders = await Order.find({ timestamp: { $gte: new Date(today) } });
-  // Count items
-  const itemCounts = {};
-  orders.forEach(order => {
-    order.items.forEach(item => {
-      itemCounts[item] = (itemCounts[item] || 0) + 1;
-    });
-  });
-  res.json(itemCounts);
+  const Menu = require('../models/Menu');
+  const menuDoc = await Menu.findOne({ date: today });
+  const items = menuDoc ? menuDoc.items : [];
+  // Aggregate order counts for today
+  const Order = require('../models/Order');
+  const agg = await Order.aggregate([
+    { $match: { timestamp: { $gte: new Date(today) } } },
+    { $unwind: "$items" },
+    { $group: { _id: "$items", count: { $sum: 1 } } }
+  ]);
+  // Build summary with maxPerDay
+  const summary = items.reduce((acc, item) => {
+    const found = agg.find(a => a._id === item.name);
+    acc[item.name] = {
+      count: found ? found.count : 0,
+      maxPerDay: item.maxPerDay
+    };
+    return acc;
+  }, {});
+  res.json(summary);
 });
 
 // POST /api/admin/menu - set today's menu for lunch or snacks
@@ -141,6 +151,26 @@ router.post('/menu', jwtAdminAuth, async (req, res) => {
   menu.items.push(...items.map(i => ({ ...i, type })));
   await menu.save();
   res.json(menu);
+});
+
+// GET /api/admin/finance-summary - total gain and dues for today
+router.get('/finance-summary', jwtAdminAuth, async (req, res) => {
+  const today = new Date().toISOString().slice(0, 10);
+  const Order = require('../models/Order');
+  const User = require('../models/User');
+  // Total gain: sum of all order totals for today
+  const gainAgg = await Order.aggregate([
+    { $match: { timestamp: { $gte: new Date(today) } } },
+    { $group: { _id: null, total: { $sum: "$total" } } }
+  ]);
+  const totalGain = gainAgg.length ? gainAgg[0].total : 0;
+  // Total dues: sum of all negative user balances
+  const duesAgg = await User.aggregate([
+    { $match: { balance: { $lt: 0 } } },
+    { $group: { _id: null, total: { $sum: "$balance" } } }
+  ]);
+  const totalDues = duesAgg.length ? Math.abs(duesAgg[0].total) : 0;
+  res.json({ totalGain, totalDues });
 });
 
 module.exports = router; 

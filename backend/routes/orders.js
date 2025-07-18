@@ -29,6 +29,20 @@ router.post('/', authUser, async (req, res) => {
   if (mealCount + newMealOrders > 200) {
     return res.status(400).json({ error: 'Daily meal limit reached. No more meals can be ordered today.' });
   }
+  // Enforce per-item maxPerDay
+  const Menu = require('../models/Menu');
+  const menuDoc = await Menu.findOne({ date: today });
+  if (menuDoc) {
+    for (const item of menuDoc.items) {
+      const orderedQty = items.filter(i => i === item.name).length;
+      if (orderedQty > 0) {
+        const todayCount = await Order.countDocuments({ timestamp: { $gte: new Date(today) }, items: { $in: [item.name] } });
+        if (todayCount + orderedQty > item.maxPerDay) {
+          return res.status(400).json({ error: `Limit reached for ${item.name}. Max per day: ${item.maxPerDay}` });
+        }
+      }
+    }
+  }
   // Check slot count
   const slotCount = await Order.countDocuments({ slot, timestamp: { $gte: new Date(today) } });
   if (slotCount >= 5) return res.status(400).json({ error: 'Slot full, pick another' });
@@ -47,8 +61,8 @@ router.post('/mine', authUser, async (req, res) => {
 
 // POST /api/order - slot booking
 router.post('/order', async (req, res) => {
-  const { userId, mealType, preferredSlotTime, payLater, total } = req.body;
-  if (!userId || !mealType || !preferredSlotTime) return res.status(400).json({ error: 'Missing fields' });
+  const { userId, mealType, preferredSlotTime, payLater, total, items } = req.body;
+  if (!userId || !mealType || !preferredSlotTime || !items) return res.status(400).json({ error: 'Missing fields' });
   const today = new Date().toISOString().slice(0, 10);
   // Try preferred slot first
   let slot = await Slot.findOne({
@@ -79,6 +93,7 @@ router.post('/order', async (req, res) => {
   const Order = require('../models/Order');
   const order = await Order.create({
     userId,
+    items,
     mealType,
     slotId: slot._id,
     total,

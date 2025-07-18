@@ -20,6 +20,7 @@ export default function Admin() {
   const [menuLunch, setMenuLunch] = useState([]);
   const [menuSnacks, setMenuSnacks] = useState([]);
   const [menuLoading, setMenuLoading] = useState(false);
+  const [finance, setFinance] = useState({ totalGain: 0, totalDues: 0 });
   const router = useRouter();
 
   // Get admin token
@@ -242,8 +243,8 @@ export default function Admin() {
 
   // Add/remove menu items
   const addMenuItem = (type) => {
-    if (type === 'lunch') setMenuLunch([...menuLunch, { name: '', price: '' }]);
-    else setMenuSnacks([...menuSnacks, { name: '', price: '' }]);
+    if (type === 'lunch') setMenuLunch([...menuLunch, { name: '', price: '', type: 'lunch', maxPerDay: 200 }]);
+    else setMenuSnacks([...menuSnacks, { name: '', price: '', type: 'snack', maxPerDay: 200 }]);
   };
   const removeMenuItem = (type, idx) => {
     if (type === 'lunch') setMenuLunch(menuLunch.filter((_, i) => i !== idx));
@@ -255,11 +256,19 @@ export default function Admin() {
   };
   const saveMenu = async (type) => {
     try {
-      const items = (type === 'lunch' ? menuLunch : menuSnacks).filter(i => i.name && i.price);
+      const items = (type === 'lunch' ? menuLunch : menuSnacks).filter(i => i.name && i.price).map(i => ({ ...i, type, price: Number(i.price), maxPerDay: Number(i.maxPerDay) }));
       await axios.post('http://localhost:5000/api/admin/menu', { items, type }, authHeaders);
       fetchMenu();
     } catch {}
   };
+
+  const fetchFinance = async () => {
+    try {
+      const res = await axios.get('http://localhost:5000/api/admin/finance-summary', authHeaders);
+      setFinance(res.data);
+    } catch {}
+  };
+  useEffect(() => { if (token) fetchFinance(); }, [token]);
 
   // Logout handler
   const handleLogout = () => {
@@ -275,6 +284,17 @@ export default function Admin() {
         <button onClick={handleLogout} className="px-5 py-2 bg-orange-600 text-white rounded-lg shadow hover:bg-orange-700 transition">Logout</button>
       </div>
       <div className="max-w-5xl mx-auto py-10 px-4 space-y-10">
+        {/* Finance Summary */}
+        <div className="flex flex-col md:flex-row gap-6 mb-8">
+          <div className="flex-1 bg-green-50 border border-green-200 rounded-2xl shadow p-6 flex flex-col items-center justify-center">
+            <div className="text-lg text-green-800 font-semibold mb-1">Total Gain (Today)</div>
+            <div className="text-3xl font-extrabold text-green-900">₹{finance.totalGain}</div>
+          </div>
+          <div className="flex-1 bg-orange-50 border border-orange-200 rounded-2xl shadow p-6 flex flex-col items-center justify-center">
+            <div className="text-lg text-orange-800 font-semibold mb-1">Total Dues</div>
+            <div className="text-3xl font-extrabold text-orange-900">₹{finance.totalDues}</div>
+          </div>
+        </div>
         {/* Slot Management Section */}
         <div className="bg-white rounded-2xl shadow-lg p-8 border border-orange-100">
           <div className="flex items-center justify-between mb-4">
@@ -378,13 +398,15 @@ export default function Admin() {
                   <tr>
                     <th className="text-left font-semibold text-orange-700">Item</th>
                     <th className="font-semibold text-orange-700">Total Orders</th>
+                    <th className="font-semibold text-orange-700">Max/Day</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {Object.entries(summary).map(([item, count], idx) => (
+                  {Object.entries(summary).map(([item, data], idx) => (
                     <tr key={item + '-' + idx}>
                       <td className="py-2">{item}</td>
-                      <td className="py-2">{count}</td>
+                      <td className="py-2">{data.count}</td>
+                      <td className="py-2">{data.maxPerDay}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -423,6 +445,11 @@ export default function Admin() {
                 <div key={idx} className="flex gap-2 mb-2 items-center">
                   <input type="text" placeholder="Item name" value={item.name} onChange={e => updateMenuItem('lunch', idx, 'name', e.target.value)} className="p-2 border border-orange-200 rounded-lg w-32" />
                   <input type="number" placeholder="Price" value={item.price} onChange={e => updateMenuItem('lunch', idx, 'price', e.target.value)} className="p-2 border border-orange-200 rounded-lg w-24" />
+                  <select value={item.type} onChange={e => updateMenuItem('lunch', idx, 'type', e.target.value)} className="p-2 border border-orange-200 rounded-lg w-28">
+                    <option value="lunch">Lunch</option>
+                    <option value="snack">Snack</option>
+                  </select>
+                  <input type="number" placeholder="Max/Day" value={item.maxPerDay} onChange={e => updateMenuItem('lunch', idx, 'maxPerDay', e.target.value)} className="p-2 border border-orange-200 rounded-lg w-24" />
                   <button onClick={() => removeMenuItem('lunch', idx)} className="px-2 py-1 bg-red-500 text-white rounded text-xs">Remove</button>
                 </div>
               ))}
@@ -448,6 +475,11 @@ export default function Admin() {
                 <div key={idx} className="flex gap-2 mb-2 items-center">
                   <input type="text" placeholder="Item name" value={item.name} onChange={e => updateMenuItem('snack', idx, 'name', e.target.value)} className="p-2 border border-orange-200 rounded-lg w-32" />
                   <input type="number" placeholder="Price" value={item.price} onChange={e => updateMenuItem('snack', idx, 'price', e.target.value)} className="p-2 border border-orange-200 rounded-lg w-24" />
+                  <select value={item.type} onChange={e => updateMenuItem('snack', idx, 'type', e.target.value)} className="p-2 border border-orange-200 rounded-lg w-28">
+                    <option value="lunch">Lunch</option>
+                    <option value="snack">Snack</option>
+                  </select>
+                  <input type="number" placeholder="Max/Day" value={item.maxPerDay} onChange={e => updateMenuItem('snack', idx, 'maxPerDay', e.target.value)} className="p-2 border border-orange-200 rounded-lg w-24" />
                   <button onClick={() => removeMenuItem('snack', idx)} className="px-2 py-1 bg-red-500 text-white rounded text-xs">Remove</button>
                 </div>
               ))}

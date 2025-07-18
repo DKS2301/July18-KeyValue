@@ -15,6 +15,7 @@ export default function Menu() {
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
+  const [category, setCategory] = useState('lunch');
   const router = useRouter();
 
   useEffect(() => {
@@ -71,7 +72,8 @@ export default function Menu() {
         mealType,
         preferredSlotTime: selectedSlot,
         payLater,
-        total
+        total,
+        items
       });
       if (res.data.message && res.data.slot && res.data.message.includes('Preferred slot full')) {
         setFallbackSlot(res.data.slot);
@@ -99,15 +101,15 @@ export default function Menu() {
           <p className="text-orange-700 text-sm mt-1">XPressMeal Canteen</p>
         </div>
         <div className="mb-4 w-full">
-          <label className="block mb-1 font-semibold text-orange-800">Meal Type</label>
-          <select value={mealType} onChange={e => setMealType(e.target.value)} className="w-full p-3 border border-orange-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
-            <option value="Lunch">Lunch</option>
-            <option value="Snack">Snack</option>
+          <label className="block mb-1 font-semibold text-orange-800">Category</label>
+          <select value={category} onChange={e => setCategory(e.target.value)} className="w-full p-3 border border-orange-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
+            <option value="lunch">Lunch</option>
+            <option value="snack">Snack</option>
           </select>
         </div>
         <div className="w-full mb-4">
           <label className="block mb-1 font-semibold text-orange-800">Menu</label>
-          {menu.items.map(item => (
+          {menu.items.filter(item => item.type === category).map(item => (
             <div key={item.name} className="flex justify-between items-center mb-2">
               <span className="text-orange-900">{item.name} <span className="text-gray-500">(₹{item.price})</span></span>
               <input type="number" min="0" value={quantities[item.name]} onChange={e => setQuantities(q => ({ ...q, [item.name]: Math.max(0, +e.target.value) }))} className="w-20 p-2 border border-orange-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400" />
