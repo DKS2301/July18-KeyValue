@@ -33,8 +33,12 @@ router.post('/', authUser, async (req, res) => {
   const Menu = require('../models/Menu');
   const menuDoc = await Menu.findOne({ date: today });
   if (menuDoc) {
+    const itemCounts = {};
+    for (const itemName of items) {
+      itemCounts[itemName] = (itemCounts[itemName] || 0) + 1;
+    }
     for (const item of menuDoc.items) {
-      const orderedQty = items.filter(i => i === item.name).length;
+      const orderedQty = itemCounts[item.name] || 0;
       if (orderedQty > 0) {
         const todayCount = await Order.countDocuments({ timestamp: { $gte: new Date(today) }, items: { $in: [item.name] } });
         if (todayCount + orderedQty > item.maxPerDay) {
@@ -64,6 +68,24 @@ router.post('/order', async (req, res) => {
   const { userId, mealType, preferredSlotTime, payLater, total, items } = req.body;
   if (!userId || !mealType || !preferredSlotTime || !items) return res.status(400).json({ error: 'Missing fields' });
   const today = new Date().toISOString().slice(0, 10);
+  // Enforce per-item maxPerDay
+  const Menu = require('../models/Menu');
+  const menuDoc = await Menu.findOne({ date: today });
+  if (menuDoc) {
+    const itemCounts = {};
+    for (const itemName of items) {
+      itemCounts[itemName] = (itemCounts[itemName] || 0) + 1;
+    }
+    for (const item of menuDoc.items) {
+      const orderedQty = itemCounts[item.name] || 0;
+      if (orderedQty > 0) {
+        const todayCount = await Order.countDocuments({ timestamp: { $gte: new Date(today) }, items: { $in: [item.name] } });
+        if (todayCount + orderedQty > item.maxPerDay) {
+          return res.status(400).json({ error: `Out of stock: ${item.name}. Only ${item.maxPerDay - todayCount} left for today.` });
+        }
+      }
+    }
+  }
   // Try preferred slot first
   let slot = await Slot.findOne({
     slotStart: preferredSlotTime,
@@ -90,7 +112,6 @@ router.post('/order', async (req, res) => {
   );
   if (!updated) return res.status(400).json({ error: 'Slot just filled, try again' });
   // Create order
-  const Order = require('../models/Order');
   const order = await Order.create({
     userId,
     items,
