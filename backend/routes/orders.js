@@ -1,6 +1,7 @@
 const express = require('express');
 const Order = require('../models/Order');
 const User = require('../models/User');
+const Slot = require('../models/Slot');
 
 const router = express.Router();
 
@@ -35,6 +36,51 @@ router.post('/mine', authUser, async (req, res) => {
   res.json(orders);
 });
 
+// POST /api/order - slot booking
+router.post('/order', async (req, res) => {
+  const { userId, mealType, preferredSlotTime, payLater, total } = req.body;
+  if (!userId || !mealType || !preferredSlotTime) return res.status(400).json({ error: 'Missing fields' });
+  const today = new Date().toISOString().slice(0, 10);
+  // Try preferred slot first
+  let slot = await Slot.findOne({
+    slotStart: preferredSlotTime,
+    date: today,
+    status: 'open',
+    $expr: { $lt: ["$currentOrders", "$maxOrders"] }
+  });
+  if (!slot) {
+    // Find next available slot
+    slot = await Slot.findOne({
+      date: today,
+      status: 'open',
+      $expr: { $lt: ["$currentOrders", "$maxOrders"] }
+    }).sort({ slotStart: 1 });
+    if (!slot) return res.status(400).json({ error: 'All slots full' });
+    // Suggest fallback
+    return res.status(200).json({ message: 'Preferred slot full, assigned next available', slot });
+  }
+  // Atomically increment currentOrders and check capacity
+  const updated = await Slot.findOneAndUpdate(
+    { _id: slot._id, currentOrders: { $lt: slot.maxOrders } },
+    { $inc: { currentOrders: 1 }, $set: { status: (slot.currentOrders + 1 >= slot.maxOrders) ? 'full' : 'open' } },
+    { new: true }
+  );
+  if (!updated) return res.status(400).json({ error: 'Slot just filled, try again' });
+  // Create order
+  const Order = require('../models/Order');
+  const order = await Order.create({
+    userId,
+    mealType,
+    slotId: slot._id,
+    total,
+    slot: `${slot.slotStart} - ${slot.slotEnd}`,
+    payLater,
+    orderStatus: 'confirmed',
+    paymentStatus: payLater ? 'unpaid' : 'paid'
+  });
+  res.json({ message: 'Order confirmed', slot: updated, order });
+});
+
 // GET /api/orders/slots - get slot counts for today
 router.get('/slots', async (req, res) => {
   const today = new Date().toISOString().slice(0, 10);
@@ -46,6 +92,13 @@ router.get('/slots', async (req, res) => {
   const slots = [
     '1:00 PM', '1:10 PM', '1:20 PM', '1:30 PM', '1:40 PM', '1:50 PM', '2:00 PM'
   ].map(slot => ({ slot, count: slotCounts[slot] || 0 }));
+  res.json(slots);
+});
+
+// GET /api/slots/today - get all slots for today
+router.get('/slots/today', async (req, res) => {
+  const today = new Date().toISOString().slice(0, 10);
+  const slots = await Slot.find({ date: today }).sort({ slotStart: 1 });
   res.json(slots);
 });
 
