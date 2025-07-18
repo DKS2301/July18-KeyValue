@@ -11,6 +11,10 @@ export default function Menu() {
   const [payLater, setPayLater] = useState(null);
   const [mealType, setMealType] = useState('Lunch');
   const [fallbackSlot, setFallbackSlot] = useState(null);
+  const [showOrders, setShowOrders] = useState(false);
+  const [orders, setOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [orderSuccess, setOrderSuccess] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -27,6 +31,30 @@ export default function Menu() {
       .then(res => setSlots(res.data))
       .catch(() => setSlots([]));
   }, []);
+
+  const fetchOrders = async () => {
+    setOrdersLoading(true);
+    setError('');
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      const res = await axios.post('http://localhost:5000/api/orders/mine', {
+        phone: localStorage.getItem('phone'),
+        roll: localStorage.getItem('roll'),
+        password: localStorage.getItem('password')
+      });
+      setOrders(res.data);
+    } catch (err) {
+      setError('Failed to fetch previous orders');
+      setOrders([]);
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
+  const handleShowOrders = () => {
+    setShowOrders(v => !v);
+    if (!showOrders) fetchOrders();
+  };
 
   const handleOrder = async () => {
     setError('');
@@ -51,7 +79,9 @@ export default function Menu() {
         setSelectedSlot(res.data.slot.slotStart);
         return;
       }
-      router.push('/success');
+      setOrderSuccess(true);
+      setShowOrders(true);
+      fetchOrders();
     } catch (err) {
       setError(err.response?.data?.error || 'Order failed');
     }
@@ -119,7 +149,32 @@ export default function Menu() {
           </div>
         )}
         <button onClick={handleOrder} className="w-full mt-6 bg-green-600 text-white px-6 py-3 rounded-lg font-semibold shadow hover:bg-green-700 transition">Confirm Order</button>
+        {orderSuccess && <div className="w-full mt-4 text-green-700 bg-green-100 p-3 rounded-lg text-center font-semibold">Order placed successfully! See your order below.</div>}
         {error && <div className="text-red-500 mt-3 w-full text-center">{error}</div>}
+        <button type="button" onClick={handleShowOrders} className="w-full mt-4 bg-orange-100 text-orange-800 border border-orange-200 rounded-lg py-2 font-semibold hover:bg-orange-200 transition">{showOrders ? 'Hide' : 'View'} Previous Orders</button>
+        {showOrders && (
+          <div className="w-full mt-6 bg-orange-50 rounded-lg p-4 border border-orange-200">
+            <h3 className="text-lg font-bold text-orange-900 mb-2">Previous Orders</h3>
+            {ordersLoading ? (
+              <div className="text-orange-700">Loading...</div>
+            ) : orders.length === 0 ? (
+              <div className="text-gray-500">No previous orders found.</div>
+            ) : (
+              <ul className="space-y-2">
+                {orders.map(order => (
+                  <li key={order._id} className="bg-white rounded shadow p-3 flex flex-col md:flex-row md:items-center md:justify-between border border-orange-100">
+                    <div>
+                      <div className="font-semibold text-orange-800">{order.items.join(', ')}</div>
+                      <div className="text-sm text-gray-500">Slot: {order.slot} | Total: ₹{order.total}</div>
+                      <div className="text-xs text-gray-400">{new Date(order.timestamp).toLocaleString()}</div>
+                    </div>
+                    <div className="mt-2 md:mt-0 text-xs text-orange-700 font-semibold">{order.payLater ? (order.paymentStatus === 'paid' ? 'Paid' : 'Pay Later') : 'Paid'}</div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

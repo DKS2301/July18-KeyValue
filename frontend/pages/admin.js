@@ -17,6 +17,9 @@ export default function Admin() {
   const [summary, setSummary] = useState({});
   const [error, setError] = useState('');
   const [dues, setDues] = useState([]);
+  const [menuLunch, setMenuLunch] = useState([]);
+  const [menuSnacks, setMenuSnacks] = useState([]);
+  const [menuLoading, setMenuLoading] = useState(false);
   const router = useRouter();
 
   // Get admin token
@@ -45,7 +48,6 @@ export default function Admin() {
   const fetchTodaySlots = async () => {
     try {
       const res = await axios.get('http://localhost:5000/api/orders/slots/today');
-      console.log("Today's slots",res)
       setTodaySlots(res.data);
     } catch {
       setTodaySlots([]);
@@ -221,6 +223,44 @@ export default function Admin() {
     if (token) fetchDues();
   }, [token]);
 
+  // Fetch today's menu
+  const fetchMenu = async () => {
+    setMenuLoading(true);
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const res = await axios.get('http://localhost:5000/api/menu/today');
+      setMenuLunch(res.data.items.filter(i => i.type === 'lunch'));
+      setMenuSnacks(res.data.items.filter(i => i.type === 'snack'));
+    } catch {
+      setMenuLunch([]);
+      setMenuSnacks([]);
+    } finally {
+      setMenuLoading(false);
+    }
+  };
+  useEffect(() => { fetchMenu(); }, []);
+
+  // Add/remove menu items
+  const addMenuItem = (type) => {
+    if (type === 'lunch') setMenuLunch([...menuLunch, { name: '', price: '' }]);
+    else setMenuSnacks([...menuSnacks, { name: '', price: '' }]);
+  };
+  const removeMenuItem = (type, idx) => {
+    if (type === 'lunch') setMenuLunch(menuLunch.filter((_, i) => i !== idx));
+    else setMenuSnacks(menuSnacks.filter((_, i) => i !== idx));
+  };
+  const updateMenuItem = (type, idx, field, value) => {
+    if (type === 'lunch') setMenuLunch(menuLunch.map((item, i) => i === idx ? { ...item, [field]: value } : item));
+    else setMenuSnacks(menuSnacks.map((item, i) => i === idx ? { ...item, [field]: value } : item));
+  };
+  const saveMenu = async (type) => {
+    try {
+      const items = (type === 'lunch' ? menuLunch : menuSnacks).filter(i => i.name && i.price);
+      await axios.post('http://localhost:5000/api/admin/menu', { items, type }, authHeaders);
+      fetchMenu();
+    } catch {}
+  };
+
   // Logout handler
   const handleLogout = () => {
     localStorage.removeItem('adminToken');
@@ -319,7 +359,6 @@ export default function Admin() {
                         <button onClick={() => handleSlotStatus(slot._id, 'open')} className="px-2 py-1 bg-green-600 text-white rounded shadow hover:bg-green-700 transition text-xs">Open</button>
                       )
                       }
-                      {console.log("State",todaySlots,"Slot Ids",slot._id)}
                     </td>
                   </tr>
                 ))}
@@ -371,6 +410,62 @@ export default function Admin() {
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+        {/* Today's Menu Section */}
+        <div className="bg-white rounded-2xl shadow-lg p-8 border border-orange-100">
+          <h3 className="text-xl font-bold text-orange-800 mb-4">Today's Menu</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Lunch Menu */}
+            <div>
+              <h4 className="font-semibold text-orange-700 mb-2">Lunch</h4>
+              {menuLunch.map((item, idx) => (
+                <div key={idx} className="flex gap-2 mb-2 items-center">
+                  <input type="text" placeholder="Item name" value={item.name} onChange={e => updateMenuItem('lunch', idx, 'name', e.target.value)} className="p-2 border border-orange-200 rounded-lg w-32" />
+                  <input type="number" placeholder="Price" value={item.price} onChange={e => updateMenuItem('lunch', idx, 'price', e.target.value)} className="p-2 border border-orange-200 rounded-lg w-24" />
+                  <button onClick={() => removeMenuItem('lunch', idx)} className="px-2 py-1 bg-red-500 text-white rounded text-xs">Remove</button>
+                </div>
+              ))}
+              <button onClick={() => addMenuItem('lunch')} className="mt-2 px-2 py-1 bg-orange-500 text-white rounded text-xs">Add Lunch Item</button>
+              <button onClick={() => saveMenu('lunch')} className="mt-2 ml-2 px-2 py-1 bg-green-600 text-white rounded text-xs">Save Lunch Menu</button>
+              {/* List current lunch menu */}
+              <div className="mt-6">
+                <h5 className="font-semibold text-orange-600 mb-2">Current Lunch Menu</h5>
+                <ul className="space-y-1">
+                  {menuLunch.filter(i => i.name && i.price).map((item, idx) => (
+                    <li key={item.name + '-' + item.price + '-' + idx} className="flex justify-between text-orange-900 bg-orange-50 rounded px-3 py-1">
+                      <span>{item.name}</span>
+                      <span>₹{item.price}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+            {/* Snacks Menu */}
+            <div>
+              <h4 className="font-semibold text-orange-700 mb-2">Snacks</h4>
+              {menuSnacks.map((item, idx) => (
+                <div key={idx} className="flex gap-2 mb-2 items-center">
+                  <input type="text" placeholder="Item name" value={item.name} onChange={e => updateMenuItem('snack', idx, 'name', e.target.value)} className="p-2 border border-orange-200 rounded-lg w-32" />
+                  <input type="number" placeholder="Price" value={item.price} onChange={e => updateMenuItem('snack', idx, 'price', e.target.value)} className="p-2 border border-orange-200 rounded-lg w-24" />
+                  <button onClick={() => removeMenuItem('snack', idx)} className="px-2 py-1 bg-red-500 text-white rounded text-xs">Remove</button>
+                </div>
+              ))}
+              <button onClick={() => addMenuItem('snack')} className="mt-2 px-2 py-1 bg-orange-500 text-white rounded text-xs">Add Snack Item</button>
+              <button onClick={() => saveMenu('snack')} className="mt-2 ml-2 px-2 py-1 bg-green-600 text-white rounded text-xs">Save Snacks Menu</button>
+              {/* List current snacks menu */}
+              <div className="mt-6">
+                <h5 className="font-semibold text-orange-600 mb-2">Current Snacks Menu</h5>
+                <ul className="space-y-1">
+                  {menuSnacks.filter(i => i.name && i.price).map((item, idx) => (
+                    <li key={item.name + '-' + item.price + '-' + idx} className="flex justify-between text-orange-900 bg-orange-50 rounded px-3 py-1">
+                      <span>{item.name}</span>
+                      <span>₹{item.price}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
           </div>
         </div>
       </div>

@@ -87,6 +87,10 @@ router.post('/order', async (req, res) => {
     orderStatus: 'confirmed',
     paymentStatus: payLater ? 'unpaid' : 'paid'
   });
+  // Update dues if payLater
+  if (payLater) {
+    await User.findByIdAndUpdate(userId, { $inc: { balance: -total } });
+  }
   res.json({ message: 'Order confirmed', slot: updated, order });
 });
 

@@ -4,6 +4,7 @@ const User = require('../models/User');
 const SlotConfig = require('../models/SlotConfig');
 const Slot = require('../models/Slot');
 const jwt = require('jsonwebtoken');
+const Menu = require('../models/Menu');
 
 const router = express.Router();
 
@@ -123,6 +124,23 @@ router.get('/summary', jwtAdminAuth, async (req, res) => {
     });
   });
   res.json(itemCounts);
+});
+
+// POST /api/admin/menu - set today's menu for lunch or snacks
+router.post('/menu', jwtAdminAuth, async (req, res) => {
+  const { items, type } = req.body;
+  if (!Array.isArray(items) || !type) return res.status(400).json({ error: 'Items and type required' });
+  const today = new Date().toISOString().slice(0, 10);
+  let menu = await Menu.findOne({ date: today });
+  if (!menu) {
+    menu = await Menu.create({ date: today, items: [] });
+  }
+  // Remove existing items of this type
+  menu.items = menu.items.filter(i => i.type !== type);
+  // Add new items
+  menu.items.push(...items.map(i => ({ ...i, type })));
+  await menu.save();
+  res.json(menu);
 });
 
 module.exports = router; 
