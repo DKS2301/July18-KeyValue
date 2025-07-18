@@ -19,8 +19,17 @@ async function authUser(req, res, next) {
 router.post('/', authUser, async (req, res) => {
   const { items, total, slot, payLater } = req.body;
   if (!items || !total || !slot || typeof payLater !== 'boolean') return res.status(400).json({ error: 'Missing fields' });
-  // Check slot count
+  // Enforce daily meal cap (200 meals per day)
   const today = new Date().toISOString().slice(0, 10);
+  const mealCount = await Order.countDocuments({
+    timestamp: { $gte: new Date(today) },
+    items: { $in: ['Meal'] }
+  });
+  const newMealOrders = items.filter(i => i === 'Meal').length;
+  if (mealCount + newMealOrders > 200) {
+    return res.status(400).json({ error: 'Daily meal limit reached. No more meals can be ordered today.' });
+  }
+  // Check slot count
   const slotCount = await Order.countDocuments({ slot, timestamp: { $gte: new Date(today) } });
   if (slotCount >= 5) return res.status(400).json({ error: 'Slot full, pick another' });
   const order = await Order.create({ userId: req.user._id, items, total, slot, payLater });

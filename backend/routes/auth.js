@@ -1,4 +1,5 @@
 const express = require('express');
+const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
 const router = express.Router();
@@ -18,6 +19,12 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid password' });
     }
   }
+  // If admin, return JWT token
+  if (user.role === 'admin') {
+    const token = jwt.sign({ uid: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1d' });
+    return res.json({ token, user });
+  }
+  // For students, just return user
   res.json({ user });
 });
 

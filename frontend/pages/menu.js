@@ -57,35 +57,42 @@ export default function Menu() {
     }
   };
 
-  if (error && !fallbackSlot) return <div className="min-h-screen flex items-center justify-center">{error}</div>;
-  if (!menu) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  if (error && !fallbackSlot) return <div className="min-h-screen flex items-center justify-center font-sans bg-gradient-to-br from-amber-50 to-orange-100">{error}</div>;
+  if (!menu) return <div className="min-h-screen flex items-center justify-center font-sans bg-gradient-to-br from-amber-50 to-orange-100">Loading...</div>;
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
-      <h2 className="text-2xl font-bold mb-4">Today’s Menu</h2>
-      <div className="bg-white p-6 rounded shadow-md w-full max-w-md mb-4">
-        <div className="mb-4">
-          <label className="block mb-1 font-semibold">Meal Type</label>
-          <select value={mealType} onChange={e => setMealType(e.target.value)} className="w-full p-2 border rounded">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-100 font-sans">
+      <div className="bg-white rounded-2xl shadow-xl p-10 w-full max-w-lg border border-orange-100 flex flex-col items-center">
+        <div className="mb-6 flex flex-col items-center">
+          <span className="text-4xl mb-2">🍽️</span>
+          <h2 className="text-2xl font-extrabold text-orange-900 tracking-tight">Order Your Meal</h2>
+          <p className="text-orange-700 text-sm mt-1">XPressMeal Canteen</p>
+        </div>
+        <div className="mb-4 w-full">
+          <label className="block mb-1 font-semibold text-orange-800">Meal Type</label>
+          <select value={mealType} onChange={e => setMealType(e.target.value)} className="w-full p-3 border border-orange-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400">
             <option value="Lunch">Lunch</option>
             <option value="Snack">Snack</option>
           </select>
         </div>
-        {menu.items.map(item => (
-          <div key={item.name} className="flex justify-between items-center mb-2">
-            <span>{item.name} (₹{item.price})</span>
-            <input type="number" min="0" value={quantities[item.name]} onChange={e => setQuantities(q => ({ ...q, [item.name]: Math.max(0, +e.target.value) }))} className="w-16 p-1 border rounded" />
-          </div>
-        ))}
-        <div className="mt-4">
-          <label className="block mb-1 font-semibold">Select Pickup Slot</label>
+        <div className="w-full mb-4">
+          <label className="block mb-1 font-semibold text-orange-800">Menu</label>
+          {menu.items.map(item => (
+            <div key={item.name} className="flex justify-between items-center mb-2">
+              <span className="text-orange-900">{item.name} <span className="text-gray-500">(₹{item.price})</span></span>
+              <input type="number" min="0" value={quantities[item.name]} onChange={e => setQuantities(q => ({ ...q, [item.name]: Math.max(0, +e.target.value) }))} className="w-20 p-2 border border-orange-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400" />
+            </div>
+          ))}
+        </div>
+        <div className="w-full mb-4">
+          <label className="block mb-1 font-semibold text-orange-800">Select Pickup Slot</label>
           <div className="flex flex-col gap-2">
             {slots.map(slot => (
               <button
-                key={slot._id}
+                key={slot._id || `${slot.slotStart}-${slot.slotEnd}`}
                 disabled={slot.status !== 'open'}
                 onClick={() => setSelectedSlot(slot.slotStart)}
-                className={`flex items-center justify-between px-3 py-2 rounded border ${selectedSlot === slot.slotStart ? 'border-blue-600 bg-blue-50' : 'border-gray-300'} ${slot.status === 'full' ? 'bg-red-100 text-gray-400' : slot.status === 'open' && slot.currentOrders >= slot.maxOrders - 3 ? 'bg-yellow-100' : ''}`}
+                className={`flex items-center justify-between px-4 py-3 rounded-lg border text-base font-medium transition ${selectedSlot === slot.slotStart ? 'border-orange-600 bg-orange-50' : 'border-gray-300'} ${slot.status === 'full' ? 'bg-red-100 text-gray-400' : slot.status === 'open' && slot.currentOrders >= slot.maxOrders - 3 ? 'bg-yellow-100' : ''}`}
               >
                 <span>{slot.slotStart} - {slot.slotEnd}</span>
                 <span>({slot.currentOrders}/{slot.maxOrders})</span>
@@ -96,24 +103,24 @@ export default function Menu() {
             ))}
           </div>
         </div>
-        <div className="mt-4 flex gap-4">
+        <div className="w-full mb-4 flex gap-4 justify-center">
           <label className="flex items-center gap-2">
             <input type="radio" name="pay" checked={payLater === false} onChange={() => setPayLater(false)} />
-            Pay Now
+            <span className="text-orange-800">Pay Now</span>
           </label>
           <label className="flex items-center gap-2">
             <input type="radio" name="pay" checked={payLater === true} onChange={() => setPayLater(true)} />
-            Pay Later
+            <span className="text-orange-800">Pay Later</span>
           </label>
         </div>
         {fallbackSlot && (
-          <div className="mt-4 text-yellow-700 bg-yellow-100 p-2 rounded">
+          <div className="mt-4 text-yellow-700 bg-yellow-100 p-2 rounded-lg w-full text-center">
             <b>Suggested Slot:</b> {fallbackSlot.slotStart} - {fallbackSlot.slotEnd} ({fallbackSlot.currentOrders}/{fallbackSlot.maxOrders})
           </div>
         )}
+        <button onClick={handleOrder} className="w-full mt-6 bg-green-600 text-white px-6 py-3 rounded-lg font-semibold shadow hover:bg-green-700 transition">Confirm Order</button>
+        {error && <div className="text-red-500 mt-3 w-full text-center">{error}</div>}
       </div>
-      <button onClick={handleOrder} className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">Confirm Order</button>
-      {error && <div className="text-red-500 mt-2">{error}</div>}
     </div>
   );
 } 
